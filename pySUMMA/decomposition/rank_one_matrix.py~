@@ -42,7 +42,7 @@ def infer_matrix(Q, tol, max_iter, return_iters = False):
         j += 1
     # if the algorithm does not converge throw an error
     if (j == max_iter):
-        raise ValueError("Matrix decomposition did not converge, try:\n  a) Increase the maximum number of iterations above {}, or \n  b) increase the minimum tolerance above {}.".format(max_iter, tol))
+        raise ValueError("Matrix decomposition did not converge.\nIncrease the maximum number of iterations (max_iter = 500) or change minimum tolerance (tol = 1e-3).")
     # assume that the majority of methods correctly rank samples according to latent class
     if np.sum(eig_vector < 0) > Q.shape[0]/2:
         eig_vector = -eig_vector
