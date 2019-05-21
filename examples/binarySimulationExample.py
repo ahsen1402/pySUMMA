@@ -2,25 +2,38 @@
 # Test Binary
 # ================================
 
-from summa.simulate import binary
-from summa.utilities import ba
-from summa import sml, woc
+from pySUMMA.simulate import rank
+from pySUMMA.utilities import roc
+from pySUMMA import summa, woc
+from pySUMMA import plot
 
-from summa import plot
 
-M = 15
-N = 2500
-N1 = int(0.3 * N)
+# Set simulation parameters
+nClassifiers = 15
+nSamples = 2500
+nPositiveSamples = int(0.3 * nSamples)
 
-sim = binary(M, N, N1)
+# simulate data set
+sim = rank(nClassifiers, nSamples, nPositiveSamples)
 sim.sim()
 
-cls = sml()
+# apply SUMMA to the simulation data
+cls = summa()
+# note that sim.data is an nClassifier by nSample ndarray
 cls.fit(sim.data)
 
-clw = woc(rv='binary')
+# wisdom of the crowd classifier
+clw = woc()
 
-plot.performance(sim.get_ba(), cls.get_ba(),
-                {'SML':ba(cls.get_inference(sim.data), sim.labels).ba,
-                 'WOC':ba(clw.get_inference(sim.data), sim.labels).ba},
-                metric='BA')
+# compute the AUC for SUMMA and WOC ensembles, and retrieve the AUC of the best individual classifier
+clAUC = {"SUMMA" : roc(cls.get_scores(sim.data),
+                            sim.labels).auc,
+             "WOC" : roc(clw.get_scores(sim.data),
+                            sim.labels).auc,
+             "Best Ind" : sim.get_auc().max()}
+
+# plot the inferred AUC of base classifiers vs the true AUC
+# and plot the AUC of each ensemble classifier
+plot.performance(sim.get_auc(),		# True base classifier AUC
+                      cls.get_auc(),   	   	# inferred base classifier AUC
+                      clAUC) 	# ensemble AUC in python dictionary
