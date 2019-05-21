@@ -1,0 +1,93 @@
+
+
+# ================================
+# LOAD PACKAGES
+# ================================
+
+from summa.simulate import rank
+from summa.utilities import roc
+from summa import summa, woc
+from summa import plot
+
+
+# ================================
+# PARAMETERS
+# ================================
+
+M = 15
+N = 2500
+N1 = int(0.3 * N)
+
+# ================================
+# SIMULATE
+# ================================
+
+# Note the quality of the base z
+
+sim = rank(M, N, N1)
+sim.sim()
+
+
+# ================================
+# RUN CLASSIFIER
+# ================================
+
+# Note if prevalence is given as an argument the 
+# third central moment tensor will not be analyzed
+# e.g. summa(prevalence = 0.3)
+
+cls = summa()
+cls.fit(sim.data)
+
+clp = summa(prevalence=0.3)
+clp.fit(sim.data)
+
+
+clw = woc()
+
+
+# ================================
+# STATS AND PLOT
+# ================================
+
+clAUC = {'SUMMA':roc(cls.get_scores(sim.data), sim.labels).auc,
+         'WOC':roc(clw.get_scores(sim.data), sim.labels).auc,
+         "Best Ind" : sim.get_auc().max()}
+
+
+plot.performance(sim.get_auc(), 
+                 cls.get_auc(), 
+                 clAUC,
+                 savename="results.pdf")
+
+plot.performance(sim.get_auc(), 
+                 clp.get_auc(), 
+                 clAUC,
+                 savename="results_prevalenceTRUE.pdf")
+
+# ================================
+# Test Binary
+# ================================
+
+from summa.simulate import binary
+from summa.utilities import ba
+from summa import sml, woc
+
+from summa import plot
+
+M = 15
+N = 2500
+N1 = int(0.3 * N)
+
+sim = binary(M, N, N1)
+sim.sim()
+
+cls = sml()
+cls.fit(sim.data)
+
+clw = woc(rv='binary')
+
+plot.performance(sim.get_ba(), cls.get_ba(),
+                {'SML':ba(cls.get_inference(sim.data), sim.labels).ba,
+                 'WOC':ba(clw.get_inference(sim.data), sim.labels).ba},
+                metric='BA')
