@@ -1,43 +1,55 @@
 import numpy as np
-from scipy.integrate import trapz
 
-class roc:
+class Roc:
     def __init__(self, s, t):
-        '''
+        """
         Input:
-        s = numpy array of scores
-        t = numpy array of true class labels
-        '''
-        self.tpr = None
-        self.fpr = None
-        self._compute_roc(s, t)
-        self._get_auc()
+        ------
+        s : ndarray
+        (N sample) sample scores
+        
+        t: ndarray
+        (N sample) true sample labels [0, 1]
+        """
+        self.N = len(s)
+        self.tpr = np.zeros(self.N)
+        self.fpr = np.zeros(self.N)
+        self.Npositive = np.sum(t)
+        self.Nnegative = self.N - self.Npositive
+        self.deltaTPR = 1. / self.Npositive
+        self.deltaFPR = 1. / self.Nnegative
+        self._sort_data(s, t)
+        self._curve()
+        
+        
+    def _sort_data(self, s, t):
+        idx = np.argsort(s)
+        self.s = s[idx]
+        self.t = t[idx]
 
-    def _compute_roc(self, s, t):
-        if s.size > 1000:
-            scores = np.linspace(s.min(), s.max(), 1000)[::-1]
+    def _curve(self):
+        i = self.N-1
+        
+        if self.t[i] == 1:
+            self.tpr[0] = self.deltaTPR
         else:
-            scores = np.sort(s)[::-1]
-        self.tpr = np.zeros(scores.size)
-        self.fpr = np.zeros(scores.size)
-        count = 0
-        for ws in scores:
-            self.tpr[count] = self._get_tpr(s, t, ws)
-            self.fpr[count] = self._get_fpr(s, t, ws)
-            count += 1
+            self.fpr[0] = self.deltaFPR
 
-    def _get_tpr(self, s, t, thresh):
-        tp = float(np.sum(t[s >= thresh]))
-        return tp / np.sum(t)
+        self.auc = 0
 
-    def _get_fpr(self, s, t, thresh):
-        f = 1- t
-        fp = float(np.sum(f[s >= thresh]))
-        return fp / np.sum(f)
-
-    def _get_auc(self):
-        idx = np.argsort(self.fpr)
-        self.auc = trapz(self.tpr[idx], self.fpr[idx])
+        j = 1
+        i -= 1
+        while i >= 0:
+            if self.t[i] == 1:
+                self.tpr[j] = self.tpr[j-1] + self.deltaTPR
+                self.fpr[j] = self.fpr[j-1]
+            else:
+                self.tpr[j] = self.tpr[j-1]
+                self.fpr[j] = self.fpr[j-1] + self.deltaFPR
+                self.auc += self.tpr[j] * self.deltaFPR
+            j += 1
+            i -= 1
+        return None
 
     def to_dict(self):
         return {'fpr':self.fpr.tolist(),

@@ -1,259 +1,226 @@
-import numpy as np
-from .decomposition import matrix
-from .decomposition import tensor
+"""Implement the Strategy for Unsupervised Multiple Method Aggregation (SUMMA) classifier.
 
-from .utilities import ranks
+SUMMA infers base classifier performance from the empirical covariance matrix
+and third central moment tensor of base classifier predictions.  Predictions of
+base classifiers are assumed to be sample ranks, with low ranks representing positive
+class samples (1), and high ranks negative class samples (0).  Moreover, SUMMA
+assumes that the base classifier predictions are conditionally independent.  
+
+THE RESULTS OF SUMMA DEPEND ON THE VALIDITY OF THE CONDITIONAL INDEPENDENCE
+ASSUMPTION.  IF YOUR DATA DOES NOT SATISFY THE CONDITIONAL INDEPENDENCE 
+ASSUMPTION, DO NOT USE SUMMA.
+
+In this implementatino of SUMMA [1], we estimate the rank one Eigenvalue and Eigenvector
+from the empirical covariance by the iteration strategy developed by Ahsen et al. [1].
+The inferred elements are then used as the aggregation weights for computing the SUMMA
+sample scores and inferring sample class labels.
+
+We estimate the tensor singular value using a method introduced by Jaffe et al [2].
+Using tensor singular value and the Eigenvalue from the covariance matrix
+decomposition we estimate the AUC of each base classifier, and the prevalence 
+of postive class samples (class 1), without using labeled data.
+
+References:
+    1. Mehmet Eren Ahsen, Robert Vogel, and Gustavo Stolovitzky.
+    Unsupervised evaluation and weighted aggregation of ranked predictions.
+    arXiv preprint arXiv:1802.04684, 2018.
+    
+    2. Ariel Jaffe, Boaz Nadler, and Yuval Kluger. 
+    Estimating the accuracies of multiple classifiers without labeled data.
+    Artificial Intelligence and Statistics, pages 407--415, 2015.
+    
+Available classes:
+- summa: Implementatin of the SUMMA classifier
+"""
+
+import numpy as np
+from .decomposition import Matrix
+from .decomposition import Tensor
+from .utilities.check_data import check_rank_data
 from .utilities import third
 
 
-class summa:
-    """
-    Apply SUMMA ensemble to data
-    """
-    def __init__(self, prevalence=None,
-            tensor=True,
-            tol=1e-3, max_iter=500):
-        """
-        Set parameters for SUMMA algorithm
+class Summa:
+    """Apply SUMMA ensemble to data.
 
-        Input
-        ------
-        prevalence : float
-            (default None), The prevalence of the the positive class,
-        tensor : True or False
-            (default True) should the third central moment tensor be decomposed
-        max_iter : int
-            (default 500) The maximum number of iterations for matrix & tensor decomposition.
-        tol : float
-            (default 1e-3), The tolerance for matrix & tensor decomposition
-        """
-        # test data for rank values, if data are not rank values, compute sample ranks.
+    Args:
+        prevalence: the fraction of samples from the positive class.
+            When None, infer prevalence from data. (float [0,1] or None, default None)
+
+    Attributes:
+    - method: name of classifier (str).
+    - prevalence: fraction of samples from the positive class (float between 0 and 1).
+    - metric: name of performance metric associated with inference (str).
+    - N: the number of sample predictions by each base classifier used for fitting (int).
+    - cov: covariance decomposition class instance.
+    - tensor: tensor decomposition class instance.
+
+    Public Mehtods:
+    - fit: Fit the SUMMA model to the empirical covariance and third central moment.
+    - get_auc: Compute and return the inferred AUC of each base classifier (ndarray).
+    - get_prevalence: Compute and return inferred or return given sample class 
+        prevalence (float).
+    - get_weights: Get the weights used for SUMMA sample scores (ndarray).
+    - get_scores: Compute and return the SUMMA sample scores (ndarray).
+    - get_inference:  Compute and return SUMMA inferred sample class labels (ndarray).
+    """
+    
+    def __init__(self, prevalence=None):
         self.method = 'SUMMA'
-        if prevalence is not None:
-            tensor=False
         self.prevalence = prevalence
-        self.tol = tol
-        self.max_iter = max_iter
-        self._set_metric(tensor)
+        self.metric = "AUC"
 
-    # ==========================================
-    # SET METRIC
-    # ==========================================
+    def fit(self, data, tol=1e-3, max_iter=500):
+        """Infer SUMMA weights from unlabeled data.
 
-    def _set_metric(self, tensor):
+        Args:
+            data: matrix of N sample rank predictions by M 
+                base classifiers ((M, N) ndarray)
+            tol: the tolerance for convergence in matrix 
+                decomposition (float, default 1e-3).
+            max_iter: the maximum number of iterations for matrix decomposition
+                (int, default 500).
+
+        Raises:
+            ValueError: when M methods < 5 or N samples < 5.
+            ValueError: when data are not ranks.
         """
-        If the prevalence is known, by user input or tensor decomposition, return the AUC of the base classifiers, otherwise the weights are arbitrary.
-        """
-        if (not tensor) & (self.prevalence is None):
-            self.metric = 'Weights'
-        else:
-            self.metric = 'AUC'
+        if data.shape[0] < 5 or data.shape[1] < 5:
+            raise ValueError("SUMMA requires at least 5 base classifiers and samples.")
 
-    # ==========================================
-    # Fit Classifier
-    # ==========================================
+        check_rank_data(data)
 
-    def fit(self, data):
-        """
-        Infer SUMMA weights from unlabeled data
-
-        Input
-        ------
-        data : (M, N) ndarray
-            array of N sample scores by M base classifiers
-        """
-        # ensure rank data, if not compute ranks
-        R = ranks(data)
-
-        self.M = data.shape[0]
         self.N = data.shape[1]
-
+        
         # Covariance decomposition
-        self.cov = matrix(tol=self.tol, max_iter=self.max_iter)
-        self.cov.fit(np.cov(R))
+        self.cov = Matrix(tol=tol, max_iter=max_iter)
+        self.cov.fit(np.cov(data))
 
         # tensor decomposition
-        self.tensor = None
-        if (self.metric == 'AUC') & (self.prevalence is None):
-            self.tensor = tensor(tol=self.tol, max_iter=self.max_iter)
-            self.tensor.fit(third(R))
-
-
-    # ==========================================
-    # Compute mean of rank list
-    # ==========================================
-
+        if self.prevalence is None:
+            self.tensor = Tensor(third(data), self.cov.eig_vector)
+    
     def get_mean(self, N=None):
-        """
-        Compute the mean of a rank list of size N.
+        """Compute the mean of a rank list of size N.
 
-        Input
-        N : int
-            (default None) The number of samples, if None then use the number of samples in the training set, self.N.
+        Args:
+            N: The number of samples, if None then use the number of samples
+                from training set, self.N (int or None, default None)
 
-        Return
-        ------
-        float
-            The mean ranks, that is the mean of sequence of numbers 1,2, ..., N
+        Returns:
+            The mean ranks, that is the mean of sequence of 
+                numbers 1,2, ..., N (float).
         """
         if N is None:
             N = self.N
-        return (N + 1) / 2
-
-    # ==========================================
-    # Infer and return the AUC
-    # ==========================================
+        return 0.5 * (N + 1)
 
     def get_auc(self):
-        '''
-        Compute AUC from Delta
-
-        Return
-        ------
-        (M,) ndarray
-            The inferred AUC values for each base classifier
+        '''Compute AUC from Delta.
+        
+        Returns:
+            The inferred AUC values for each base classifier ((M,) ndarray).
         '''
         return self.get_delta() / self.N + 0.5
 
-    # ==========================================
-    # Infer and return Delta
-    # ==========================================
-
     def get_delta(self):
-        '''
-        Compute inferred Delta vector
-
-        Return
-        ------
-        (M,) ndarray
-            The inferred delta value for each base classifier
+        '''Compute inferred performance vector, Delta.
+        
+        Returns:
+            The inferred Delta value for each of the M 
+               base classifiers ((M,) ndarray)
         '''
         return self.cov.eig_vector * self.get_delta_norm()
 
-    # ==========================================
-    # Infer and return the norm of Delta
-    # ==========================================
-
     def get_delta_norm(self):
-        '''
-        Norm of Delta vector
+        '''Norm of performance vector Delta.
 
-        Return
-        ------
-        float
-            The norm of the inferred Delta vector
-            Case 1 : tensor decomposition
-                Return the inferred norm of delta using tensor decomposition
-            Case 2 : known prevalence
-                Return the norm of delta using the a priori specified positive class prevalence
-            Case 3 :
-                Throw error because ||Delta|| cannot be computed without the prevalence or tensor decomposition
+        Case 1: known prevalence
+            Return the norm of delta using the a priori 
+            specified positive class prevalence.
+        Case 2: inferred prevalence
+            Return the inferred norm by using
+            the tensor and covariance singular values.
+        
+        Returns: 
+            The norm of the performance vector, Delta (float).
         '''
-        if self.tensor is not None:
-            beta = (self.tensor.singular_value / self.cov.eig_value)**2
-            return np.sqrt(beta + 4*self.cov.eig_value)
-        elif self.prevalence is not None:
+        if self.prevalence is not None:
             return np.sqrt(self.cov.eig_value / (self.prevalence*(1-self.prevalence)))
         else:
-            raise ValueError("Error : Tensor decomposition is set to False and the positive class prevalence was not provided.  To obtain the balanced accuracy remedy one of these deficienies.")
-
-    # ==========================================
-    # Infer and / or return prevalence of positive class
-    # ==========================================
+            beta = (self.tensor.singular_value / self.cov.eig_value)**2
+            return np.sqrt(beta + 4*self.cov.eig_value)
 
     def get_prevalence(self):
-        """
-        Either infer or return the postive class prevalence
+        """Either infer or return the postive class prevalence.
 
-        Return
-        ------
-        float
-            The prevalence of the positive class
-
+        Case 1: Return the a priori specified prevalence
+        Case 2: Return the inferred prevalence
+        
+        Returns:
+           The sample class prevalence (float)
         """
-        if self.tensor is not None:
-            norm = self.get_delta_norm()
-            beta = self.tensor.singular_value / self.cov.eig_value
-            return 0.5 - 0.5*beta / norm
-        elif self.prevalence is not None:
+        if self.prevalence is not None:
             return self.prevalence
         else:
-            raise ValueError("Error : the positive class prevalence was not inferred or provided upon initializing SUMMA class.")
-
-    # ==========================================
-    # SUMMA weights
-    # ==========================================
+            norm = self.get_delta_norm()
+            beta = self.tensor.singular_value / self.cov.eig_value
+            return 0.5 + 0.5*beta / norm
 
     def get_weights(self):
-        '''
-        Return the SUMMA weights
+        '''Return the SUMMA weights.
 
-        Return
-        ------
-            (M,) ndarray
-                The SUMMA weight for each of the M base classifiers
+        Returns:
+            The SUMMA weight for each of the M base classifiers ((M,) ndarray)
         '''
         return self.cov.eig_vector
 
-    # ==========================================
-    # compute sample SUMMA scores
-    # ==========================================
-
     def get_scores(self, data):
-        """
-        Compute each samples SUMMA score
+        """Compute each SUMMA score for each sample.
 
-        Input
-        -----
-        data : (M, N) ndarray
-            N sample scores by M base classfiers, assumptions:
-            Case 1:
-                if samples scores are rank, low rank signifies postive class samples
-            Case 2:
-                if arbitrary score, high values signify postive class samples
+        Here we assume the convention the postive class samples have low rank,
+        while negative class samples have high rank.
+        
+        Args:
+            data : N sample rank predictions by M base classfiers ((M, N) ndarray).
 
-        Return
-        ------
-        s : (N,) ndarray
-            SUMMA score for each of the N samples
+        Returns:
+           s: SUMMA score for each of the N samples ((N,) ndarray).
+
+        Raises:
+            ValueError: if data are not rank predictions
+            TypeError: if data are not in ndarray
         """
+        check_rank_data(data)
+
         M = data.shape[0]
         N = data.shape[1]
-        # check and convert to rank
-        R = ranks(data)
+
         # compute scores
         s = 0
         for j in range(M):
-            s += self.cov.eig_vector[j] * (self.get_mean(N=N) - R[j, :])
+            s += self.cov.eig_vector[j] * (self.get_mean(N=N) - data[j, :])
         return s
 
-    # ==========================================
-    # infer class labels
-    # ==========================================
-
     def get_inference(self, data):
-        """
-        Estimate class labels from SUMMA scores.  SUMMA scores greater than zero are assigned a positive class label (1), otherwise a negative class label (0).
+        """Estimate class labels from SUMMA scores.
 
-        Input
-        -----
-        data : (M, N) ndarray
-            N sample scores by M base classfiers, assumptions:
-            Case 1:
-                if samples scores are rank, low rank signifies postive class samples
-            Case 2:
-                if arbitrary score, high values signify postive class samples
+        SUMMA scores greater than or equal to zero are assigned a
+        positive class label (1), otherwise a negative class label (0).
+        Here we assume the convention the postive class samples have low 
+        rank, while negative class samples have high rank.
 
-        Return
-        ------
-        labels : (N,) ndarray
-            Inferred class labels, 1 designating positive class and 0 negative class.
+        Args:
+            data: N sample rank predictions by M base classfiers ((M, N) ndarray).
+
+        Returns:
+            labels: Inferred sample class labels ((N,) ndarray)
+
+        Raises:
+            ValueError: if data are not rank predictions
+            TypeError: if data are not in ndarray
         """
-        labels = np.zeros(data.shape[1])
-        labels[self.get_scores(data) > 0] = 1.
+        labels = self.get_scores(data)
+        labels[labels >= 0] = 1.
+        labels[labels < 0] = 0
         return labels
-
-
-
-    # ==========================================
-    # ==========================================

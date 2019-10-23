@@ -92,7 +92,7 @@ def _update_r(Q_off_diagonal, R):
 # MATRIX CLASS
 # =====================================================
 
-class matrix:
+class Matrix:
     def __init__(self, max_iter = 5000, tol=1e-5):
         '''
         Implementation of the iterative approach for estimating a rank one matrix from the covariance of conditionally independent method predictions.

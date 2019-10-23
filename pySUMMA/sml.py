@@ -1,233 +1,215 @@
-import numpy as np
-from .decomposition import matrix
-from .decomposition import tensor
+""" Implement the Spectral Meta Learner (SML) classifier.
 
+SML infers base classifier performance from the empirical covariance matrix
+and third central moment tensor of base classifier predictions.  Predictions of
+base classifiers are assumed to be sample class labels, with 1 representing positive
+class samples, and -1 negative class samples.  Moreover, SML
+assumes that the base classifier predictions are conditionally independent.
+
+THE RESULTS OF SML DEPEND ON THE VALIDITY OF THE CONDITIONAL INDEPENDENCE
+ASSUMPTION.  IF YOUR DATA DOES NOT SATISFY THE CONDITIONAL INDEPENDENCE 
+ASSUMPTION, DO NOT USE SML.
+
+In this implementation of SML [1], we estimate the rank one Eigenvalue and 
+Eigenvector from the empirical covariance matrix by the iterative strategy
+proposed by Ahsen et al. [3].  The inferred Eigenvector elements are then
+used as the aggregation weights for computing the SML score and for inferring
+sample class labels.
+
+We estimate the tensor singular value using a method introduced by Jaffe et al [2].
+Using tensor singular value and the Eigenvalue from the covariance matrix
+decomposition we estimate the balanced accuracy of each base classifier, and
+the prevalence of postive class samples (class 1), without using labeled data.
+
+References:
+    1. Fabio Parisi, Francesco Strino, Boaz Nadler, and Yuval Kluger.
+    Ranking and combining multiple predictors without labeled data.
+    Proceedings of the National Academy of Sciences,
+    111(4):1253--1258, 2014.
+
+    2. Ariel Jaffe, Boaz Nadler, and Yuval Kluger. 
+    Estimating the accuracies of multiple classifiers without labeled data.
+    Artificial Intelligence and Statistics, pages 407--415, 2015.
+
+    3. Mehmet Eren Ahsen, Robert Vogel, and Gustavo Stolovitzky.
+    Unsupervised evaluation and weighted aggregation of ranked predictions.
+    arXiv preprint arXiv:1802.04684, 2018.
+
+Available classes:
+- sml: Implementation of the SML classifier
+"""
+
+import numpy as np
+
+from .decomposition import Matrix
+from .decomposition import Tensor
+from .utilities.check_data import check_binary_data
 from .utilities import third
 
 
-class sml:
-    """
-    Apply SML ensemble to data
+class Sml:
+    """Apply SML ensemble to data.
+    
+    Args:
+        prevalence: the fraction of samples from the  positive class.
+            When None given, infer prevalence from data. 
+            (float beteen 0 and 1 or None, default None)
 
+    Attributes:
+    - method: name of classifier (str).
+    - prevalence: fraction of samples from the positive class (float between 0 and 1)
+    - metric: name of performance metric associated with inference (str)
+    - cov: covariance decomposition class instance
+    - tensor: tensor decomposition class instance
+    
+    Public Methods:
+    - fit: Fit the SML model to the empirical covariance and third central moment.
+    - get_ba: Compute and return the inferred balanced accuracy of each base 
+        classifier (ndarray).
+    - get_prevalence: Compute and return inferred or return given sample class 
+        prevalence (float).
+    - get_weights: Get the weights used for the SML weighted sum (ndarray).
+    - get_scores: Compute and return the SML sample scores (ndarray).
+    - get_inference: Compute and return the SML inferred sample class labels (ndarray).
     """
-    def __init__(self, prevalence=None,
-            tensor=True,
-            tol=1e-3, max_iter=500):
-        """
-        Set parameters for our implementation of the SML algorithm
-
-        Input
-        -----
-        prevalence : float
-            (default None) representing the prevalence of the the positive class,
-        tensor : True or False
-            (default True) Specify whether tensor should be decomposed
-        max_iter : int
-            (default 500) The maximum number of iterations for matrix & tensor decomposition.
-        tol : float
-            (default 1e-3), The tolerance for matrix & tensor decomposition
-        """
+    
+    def __init__(self, prevalence=None):
         self.method='SML'
-        if prevalence is not None:
-            tensor=False
         self.prevalence = prevalence
-        self.tol = tol
-        self.max_iter = max_iter
-        self._set_metric(tensor)
+        self.metric = "BA"
 
-    # ==========================================
-    # SET METRIC
-    # ==========================================
+    def fit(self, data, tol=1e-3, max_iter=500):
+        """Fit the SML model to the empirical covariance and third central moment.
 
-    def _set_metric(self, tensor):
+        Args:
+            data : N sample predictions by M base classifiers ((M, N) ndarray)
+            tol: the tolerance for matrix decomposition (float, default 1e-3).
+            max_iter: of the maximum number of iterations for matrix decomposition
+                (int, default 500).
+        
+        Raises:
+            ValueError: when M methods < 5 or N samples < 5.
+            ValueError: when data are not binary values [-1, 1].
         """
-        If the prevalence is known, by user input or tensor decomposition, return the BA of the base classifiers, otherwise the weights are arbitrary.
-        """
-        if (self.prevalence is None) & (not tensor):
-            self.metric = 'Weights'
-        else:
-            self.metric = 'BA'
+        if data.shape[0] < 5 or data.shape[1] < 5:
+            raise ValueError("SML requires at least 5 base classifiers and samples.")
 
-    # ==========================================
-    # Verify that input data is binary, {0, 1}
-    # ==========================================
-
-    def _check_data(self, data):
-        """
-        Verify that the input data is binary, {0, 1}.  If data is not binary throw ValueError
-
-        Input
-        -----
-        data : (M, N) ndarray
-
-        Return
-        ------
-        None
-        """
-        if np.setdiff1d(data, [0, 1]).size != 0:
-            raise ValueError("Error: Input data must be solely comprised of values {0, 1}")
-        return None
-
-    # ==========================================
-    # Fit classifier
-    # ==========================================
-
-    def fit(self, data):
-        """
-        Infer SML weights from unlabeled data
-
-        Input
-        ------
-        data : (M, N) ndarray
-            N sample predictions by M base classifiers
-        """
-        # ensure binary data
-        self._check_data(data)
-
-        # save training dimensions
-        self.M = data.shape[0]
-        self.N = data.shape[1]
+        check_binary_data(data)
 
         # Covariance decomposition
-        self.cov = matrix(tol=self.tol,
-                            max_iter=self.max_iter)
+        self.cov = Matrix(tol=tol, max_iter=max_iter)
         self.cov.fit(np.cov(data))
 
         # tensor decomposition
-        self.tensor = None
-        # if we should fit tensor than fit it
-        if (self.metric == 'BA') & (self.prevalence is None):
-            self.tensor = tensor(tol=self.tol, max_iter=self.max_iter)
-            self.tensor.fit(third(data))
-
-    # ==========================================
-    # Infer balanced accuracy
-    # ==========================================
+        if self.prevalence is None:
+            self.tensor = Tensor(third(data), self.cov.eig_vector)
 
     def get_ba(self):
-        """
-        Compute BA from eigenvector
+        """Compute the balanced accuracy of each base classifier.
 
-        Return
-        ------
-        (M,) ndarray
-            inferred balanced accuracies
-        """
-        return 0.5*(1+self.cov.eig_vector * self.get_ba_norm())
+        Using the fitted Eigenvector and the norm of the
+        performance vector compute the inferred balanced accuracy of 
+        each base classifier.
 
-    # ==========================================
-    # Infer and return BA Norm
-    # ==========================================
+        Returns:
+            (M,) ndarray of inferred balanced accuracies.
+        """
+        return 0.5*(1 + self.cov.eig_vector * self.get_ba_norm())
 
     def get_ba_norm(self):
-        '''
-        Norm of BA vector
+        '''Compute the norm of the performance vector.
 
-        Return
-        ------
-        float
-            Case 1 : tensor decomposition
-                Return the inferred norm of BA using tensor decomposition
-            Case 2 : known prevalence
-                Return the norm of BA using the a priori specified positive class prevalence
-            Case 3 :
-                Throw error because norm of BA cannot be computed without the prevalence or tensor decomposition
+        Case 1: known prevalence
+            Return the norm of the performance vector using the a priori
+            specified positive class prevalence and Eigenvalue from the
+            matrix decomposition.
+        Case 2: tensor singular value
+            Return the inferred norm of the performance vector using the 
+            Eigenvalue and singular value estimated from the matrix and tensor 
+            decomposition, respectively.
+
+        Returns:
+            float, norm of the performance vector.
         '''
-        if self.tensor is not None:
-            beta = (self.tensor.singular_value / self.cov.eig_value)**2
-            return np.sqrt(beta + 4*self.cov.eig_value)
-        elif self.prevalence is not None:
-            return np.sqrt(self.cov.eig_value / (self.prevalence * (1-self.prevalence)))
+        if self.prevalence is not None:
+            return np.sqrt(self.cov.eig_value / (4 * self.prevalence * (1-self.prevalence)))
         else:
-            raise ValueError("Error : Tensor decomposition is set to False and the positive class prevalence was not provided.  To obtain the balanced accuracy remedy one of these deficienies.")
-
-    # ==========================================
-    # Infer and / or return prevalence of positive class
-    # ==========================================
+            beta = (self.tensor.singular_value / self.cov.eig_value)**2
+            return 0.5 * np.sqrt(beta + 4*self.cov.eig_value)
 
     def get_prevalence(self):
-        """
-        Either infer or return the postive class prevalence
+        """Return sample class prevalence.
 
-        Return
-        ------
-        float [0, 1]
-            The prevalence of the positive class
+        Case 1: known prevalence
+            Return the a priori known positive class sample prevalence.
+        Case 2: tensor singular value
+            Return the inferred positive class sample prevalence.
+
+        Returns:
+            float, prevalence of the positive class on the interval [0, 1]
         """
-        if self.tensor is not None:
-            beta = self.tensor.singular_value / self.cov.eig_value
-            return 0.5 - 0.5*beta / self.get_ba_norm()
-        elif self.prevalence is not None:
+        if self.prevalence is not None:
             return self.prevalence
         else:
-            raise ValueError("Error : the positive class prevalence was not inferred or provided upon initializing SML class.")
-
-    # ==========================================
-    # SML weights
-    # ==========================================
+            beta = self.tensor.singular_value / self.cov.eig_value
+            return 0.5 * (1  - 0.5*beta / self.get_ba_norm())
 
     def get_weights(self):
-        '''
-        Return the SML weights
+        '''Return the SML weights.
 
-        Return
-        ------
-        (M,) ndarray
-            SML weights
+        Returns:
+            (M,) ndarray SML weights
         '''
         return self.cov.eig_vector
 
-    # ==========================================
-    # compute sample SML scores
-    # ==========================================
-
     def get_scores(self, data):
+        """ Compute SML score for each sample.
+
+        The SML score is the value of approximate likelihood used
+        to infer sample class labels in Parisi et al. [1].  Simply, the
+        k^th samples score is the weighted sum of all base classifier
+        predictions.
+
+        Args:
+            data: (M, N) ndarray of N binary value predictions for 
+                each M base classifier
+
+        Returns:
+            s: (N,) ndarray of SML scores for each sample
+
+        Raises:
+            ValueError: if data are not binary predictions
+            TypeError: if data are not in ndarray
         """
-        Compute each samples SML score
-
-        Input
-        -----
-        data : (M, N) ndarray
-            array of N binary value predictions for each M base classifier
-
-        Return
-        ------
-        s : (N,) ndarray
-            SUMMA scores for each of the N samples
-        """
-        # if data is not appropriate throw error
-        self._check_data(data)
-
-        # specify the number of methods
+        check_binary_data(data)
+        
         M = data.shape[0]
 
-        # compute scores
         s = 0
         for j in range(M):
-            s += self.cov.eig_vector[j] * (data[j, :]-0.5)
+            s += self.cov.eig_vector[j] * data[j, :]
         return s
 
-    # ==========================================
-    # ==========================================
-
     def get_inference(self, data):
-        """
-        Estimate class labels from SML scores.  SML scores greater than zero are assigned a positive class label (1), otherwise a negative class label (0).
+        """Compute and return the SML inferred sample class labels.
 
-        Input
-        -----
-        data : (M, N) ndarray
-            array of N binary value predictions for each M base classifier
+        The approximate maximum likelihood esimtate of sample class labels
+        from Parisi et al. [1].  We assign samples with SML scores greater 
+        than or equal to zero with a positive class label (1), otherwise a
+        negative class label (-1).
 
-        Return
-        ------
-        labels : (N,) ndarray
-            SML inferred binary values for each sample, 1 designating positive class and 0 negative class.
+        Args:
+            data : (M, N) ndarray of N binary value predictions of M base classifiers
+
+        Returns:
+            labels : (N,) ndarray of SML inferred binary values for each sample,
+                1 designating positive class and -1 negative class.
+
+        Raises:
+            ValueError: if data are not binary predictions
+            TypeError: if data are not in ndarray
         """
-        labels = np.zeros(data.shape[1])
-        labels[self.get_scores(data) > 0] = 1.
+        labels = self.get_scores(data)
+        labels[labels >= 0] = 1.
+        labels[labels < 0] = -1.
         return labels
-
-
-    # ==========================================
-    # ==========================================

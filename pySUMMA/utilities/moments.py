@@ -2,8 +2,8 @@ import numpy as np
 
 def third(data):
     '''
-    88 ms for 50 methods and 5000 samples
     Input
+    -----
     numpy array M base classifier x N samples numpy array
 
     Returns

@@ -1,13 +1,12 @@
-
 import matplotlib.pyplot as plt
 
-
 def performance(x, y, ens, metric='AUC', savename=None):
-    """
-    Plot performance
+    """Plot the performance of base classifiers and ensembles.
+    
+    Plot the true vs. the inferred performance of each base classifier. Along
+    the y-axis plot the performance of each inputted ensemble.
 
-    Input
-    -----
+    Args:
     x : (M,) ndarray
         True performance
     y : (M, )ndarray

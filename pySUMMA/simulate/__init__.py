@@ -1,3 +1,3 @@
 
-from .binary import binary
-from .rank import rank
+from .binary import Binary
+from .rank import Rank

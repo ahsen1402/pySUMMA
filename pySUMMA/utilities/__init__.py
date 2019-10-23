@@ -1,5 +1,6 @@
 
-from .rank_transform import ranks
+from .check_data import check_rank_data
+from .check_data import check_binary_data
 from .moments import third
-from .roc import roc
-from .ba import ba
+from .roc import Roc
+from .ba import Ba

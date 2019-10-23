@@ -1,206 +1,110 @@
+"""Find the singular value of the rank one third central moment tensor.
+
+The third central moment of 3rd order conditionally independent base classifier
+predictions has a special structure [1,2].  This is, the elements T_{ijk} for
+i \neq j \neq k, are those of a rank one tensor,
+
+T_{ijk} = l  v[i] v[j] v[k]
+
+where l is the singular value and v is a unit norm vector.  In the case of SML and
+SUMMA the unit norm vector consists fo values proportional to the performance
+of each base classifier.  The peformance metric differs between problem statements.
+In SML the base classifier predictions are binary (-1, 1), and the elements are proportional
+to the balanced accuracy [1,2].  In SUMMA the base classifier predictions are sample rank
+and the vector elements are proportional to Delta, the difference between the class
+conditioned average rank values [3]. 
+
+In this implementation we use the method from Jaffe et al. [1] to estimate the 
+singular value (l) by linear regression.
+
+References:
+    1. Ariel Jaffe, Boaz Nadler, and Yuval Kluger.
+    Estimating the accuracies of multiple classifiers without labeled data.
+    Artificial Intelligence and Statistics, pages 407--415, 2015.
+    
+    2. Fabio Parisi, Francesco Strino, Boaz Nadler, and Yuval Kluger.
+    Ranking and combining multiple predictors without labeled data.
+    Proceedings of the National Academy of Sciences,
+    111(4):1253--1258, 2014.
+
+    3. Mehmet Eren Ahsen, Robert Vogel, and Gustavo Stolovitzky.
+    Unsupervised evaluation and weighted aggregation of ranked predictions.
+    arXiv preprint arXiv:1802.04684, 2018.
+
+Available classes:
+- Tensor
+"""
+
 import numpy as np
-# tools for testing the inferred weights from the covariance matrix
-import tensorly
-# tensorly.set_backend('numpy')
-# from tensorly import tensor as toTensor
-from tensorly.decomposition import parafac
-from tensorly import kruskal_to_tensor
+from scipy.special import comb
 
+def get_tensor_idx(M):
+    """Get indecies i \neq j \neq k of the 3rd order tensor (M, M, M) tensor T.
 
+    Args:
+        M: The number of entries of the tensor of interest (integer)
 
-# ==================================================
-# iterative method for inferring rank one tensor
-# ==================================================
-
-def infer_tensor(T, max_iter, tol, return_iters = False):
-    '''
-    Algorithm for inferring entries (all entries excluding i != j != k) that when substituted into the third central moment tensor results in a tensor with only one non-zero singular value.
-
-    Input
-    -----
-    T : (M, M, M) ndarray
-        The third central moment tensor
-    tol : float
-        criterion for exiting loop.  The difference of successively inferred singular values must be smaller than the tolerance
-    max_iter : integer
-        the maximum number of iterations of algorithm
-    return_items : True or False
-        (default False), should the values of each iteration be returned
-
-    Return
-    ------
-    Case 1, return_items = False:
-        singular value, factors, and convergence message
-    Case 2, return_items = True:
-        singular value, factors, the inferred singular value at each iteration, and a convergence message
-    '''
-    Q_t = T.copy()
-    # get idx to replace
-    idx = get_idx(T.shape[0])
-    # first two iterations
-    svalues = []
-    for j in range(2):
-        # CP decomposition
-        factors = parafac(Q_t, rank=1)
-        # store singular values
-        svalues.append(get_singular_value(factors))
-        # update Q_t
-        Q_t = _update_Q(Q_t, kruskal_to_tensor(factors), idx)
-    # compute difference in singular_values
-    epsilon = np.abs(svalues[1] - svalues[0])
-    # iterate until convergence or max iter is reached, whichever comes first
-    while (j < max_iter) & (epsilon > tol):
-        # CP decomp
-        factors = parafac(Q_t, rank=1)
-        # store singular value
-        svalues.append(get_singular_value(factors))
-        # update Q_t
-        Q_t = _update_Q(Q_t, kruskal_to_tensor(factors), idx)
-        epsilon = np.abs(svalues[-1] - svalues[-2])
-        j += 1
-    if (j == max_iter):
-        raise ValueError("Tensor decomposition did not converge, try:\n  a) Increase the maximum number of iterations above {},\n  b) input the prevalence, or\n  c) increase the minimum tolerance above {}.".format(max_iter, tol))
-        raise ValueError("Tensor decomposition did not converge.\nIncrease the maximum number of iterations (max_iter), input the prevalence, turn off prevalence inference, or change minimum tolerance (tol = 1e-3).")
-    # self.core = core
-    singular_value_sign = 1
-    for w in range(len(factors)):
-        factors[w] = factors[w] / norm(factors[w].squeeze())
-        if np.sum(factors[w] > 0) > factors[w].size/2:
-            factors[w] = -factors[w]
-            singular_value_sign = -singular_value_sign
-    singular_value = singular_value_sign * svalues[-1]
-    if return_iters == True:
-        return [singular_value, factors, svalues,
-                "Tensor decomposition converged in {} steps".format(j)]
-    else:
-        return [singular_value, factors, 
-                "Tensor decomposition converged in {} steps".format(j)]
-
-# ==================================================
-# vector norm
-# ==================================================
-
-def norm(vector):
+    Returns:
+        idx : list of tuples containing indexes (i, j, k) such that i \neq j \neq k (list)
     """
-    Compute the norm of a vector
-    Input
-    -----
-    (M,) ndarray
-
-    Return
-    ------
-    float representing the norm
-    """
-    return np.sqrt(np.sum(vector**2))
-
-# ==================================================
-# compute singular value from tensor factors
-# ==================================================
-
-def get_singular_value(factors):
-    """
-    Compute the singular value from the factors
-
-    Input
-    -----
-    factors : ndarray
-        list of factors produced by tensorly parafac
-
-    Return
-    ------
-    sv : float
-        singular value
-    """
-    sv = 1
-    for wfactor in factors:
-        sv = sv * norm(wfactor.squeeze())
-    return sv
-
-# ==================================================
-# get indecies of values to replace in tensor
-# ==================================================
-
-def get_idx(M):
-    """
-    Get the indexes in that need to be replace by the algorithm, specifically all entries excluding those in which i \neq j \neq k.
-
-    Input
-    -----
-    M : integer
-        The number of elements per row, column, and depth.
-
-    Return
-    idx : python list
-        Each list entry is a tuple consisting of three indexes that need to be replaced by the algorithm
-    """
-    idx = []
-    for j in range(M):
-        for k in range(M):
-            for l in range(M):
-                if len(set([j,k,l])) < 3:
-                    idx += [(j,k,l)]
+    idx = list(range(comb(M, 3, exact=True)))
+    
+    l = 0
+    for i in range(M-2):
+        for j in range(i+1, M-1):
+            for k in range(j+1, M):
+                idx[l] = (i, j, k)
+                l += 1
     return idx
 
-# ==================================================
-# update Q tensor
-# ==================================================
 
-def _update_Q(Qt, Q1, idx):
+class Tensor:
+    """ Fit singular value of third central moment tensor.
+    
+    Fit the singular value (l) for the rank one tensor whose elements
+    T_{i, j, k} = l * v[i] * v[j] * v[k] where i \neq j \neq k and v is 
+    the Eigenvector from the covariane decomposition.
+    
+    Args:
+        T: third central moment tensor ((M, M, M) ndarray)
+        v: Eigenvector of base classifier performances,
+            from the matrix decomposition class ((M,) ndarray)
+
+    Public Methods:
+    fit_singular_value:
     """
-    Using the tensor generalization of SVD, replace entries of the third central moment tensor with those of the inferred tensor that has on one non-zero singular value.
-
-    Input
-    -----
-    Qt : (M, M, M) ndarray
-        Updated third central moment tensor
-    Q1 : (M, M, M) ndarray
-        The tensor resulting from the tensor SVD decomposition
-    idx : python list
-        Entries are tuples of length three indicating the elements of Qt that need to be replaced by those of Q1.
-
-    Return
-    ------
-    Qt : (M, M, M) ndarray
-        updated Qt tensor
-    """
-    for widx in idx:
-        Qt[widx[0], widx[1], widx[2]] = Q1[widx[0], widx[1], widx[2]]
-    return Qt
-
-
-# ==================================================
-# tensor class
-# ==================================================
-
-class tensor:
-    def __init__(self, max_iter=2500, tol=1e-3, return_iters=False):
-        '''
-        Implementation of the iterative approach for estimating the approximate singular value of the third central moment tensor of conditionally independent method predictions.
-
-        Input
-        -----
-        - max_iter : (default 5000) max number of iterations
-        - tol : (default 1e-5) stopping criterion
-
-        '''
-        self.max_iter = max_iter
-        self.iters = return_iters
-        self.tol = tol
-
-    # ==================================
-    # Fit
-    # ==================================
-
-    def fit(self, T):
+    def __init__(self, T, v):
+        self.tensorIndex = get_tensor_idx(T.shape[0])
+        self.eigenvectorData, self.tensorData = self.set_tensor_eigenvector_elements(T, v)
+        self.singular_value = self.fit_singular_value()
+    
+    def set_tensor_eigenvector_elements(self, T, v):
+        """Extract tensor elements T_{ijk} for i \neq j \neq k.
+        
+        Args:
+            T: third central moment tensor ((M, M , M) ndarray).
+            v: Vector of unit norm. ((M,) ndarray).
+        
+        Returns:
+            two element list [eigData, tData] as defined below (list)
+                eigData : the product of vector entries v[i] * v[j] * v[k]
+                    ((len(self.tensorIndex),) ndarray).
+                tData : tensor elements i \neq j \neq k ((len(self.tensorIndex),) ndarray).
         """
-        Find the singular value and factors from the third central moment tensor
+        tData = np.zeros(len(self.tensorIndex))
+        eigData = np.zeros(len(self.tensorIndex))
 
-        Input
-        -----
-        T : (M, M, M) ndarray
-            The third central moment
-        """
-        if self.iters:
-            self.singular_value, self.factors, self.evals, self.msg = infer_tensor(T, self.max_iter, self.tol, return_iters=self.iters)
-        else:
-            self.singular_value, self.factors, self.msg = infer_tensor(T, self.max_iter, self.tol)
+        # store tensor elements and the product of Eigenvector elements,
+        # from each set of indices
+        j = 0
+        for widx in self.tensorIndex:
+            tData[j] = T[widx[0], widx[1], widx[2]]
+            eigData[j] = v[widx[0]] * v[widx[1]] * v[widx[2]]
+            j += 1
+        
+        return [eigData, tData]
+
+    def fit_singular_value(self):
+        """Fit singular value by linear regression."""
+        c = np.cov(self.eigenvectorData, self.tensorData)
+        return c[0, 1] / c[0, 0]

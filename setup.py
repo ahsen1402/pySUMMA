@@ -8,7 +8,7 @@ import pkg_resources
 
 NAME='pySUMMA'
 DESCRIPTION = "Implementation of methods for the aggergation of predictions by binary classification methods."
-PYTHON_VERSION=">=3.7.0"
+PYTHON_VERSION="==3.7.3"
 LICENSE_NAME="Apache License 2.0"
 
 # ========================================
@@ -58,9 +58,6 @@ setup(name=NAME,
         '':['__version__']
     },
     install_requires=REQUIREMENTS,
-#     project_urls={
-#         "Source Code": ""
-#     },
     classifiers=[
         "Programming Language :: Python :: 3.7",
         "License :: OSI Approved :: Apache Software License"
