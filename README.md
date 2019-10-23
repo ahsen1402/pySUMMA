@@ -50,11 +50,17 @@ Note, that the `--no-index` flag ensures that pip installs the local `pySUMMA` p
 That is it!
 
 
-
 ### Installation from GitHub
 
-**TODO : Write and test installation from GitHub**
+If the dependencies are installed and the corresponding virtual environment `pySummaEnv` is active then `pySUMMA` can be installed from the GitHub repository.  One way to install `pySUMMA` from the master branch is to,
 
+```bash
+(pySummaEnv) pip install git+https://github.com/ahsen1402/pySUMMA.git@master
+```
+
+at the command line.
+
+That is it!
 
 SUMMA
 -----
@@ -69,9 +75,9 @@ Below you will find an example for running in an interactive Python prompt.
 ```python
 # load modules
 
-from pySUMMA.simulate import rank
-from pySUMMA.utilities import roc
-from pySUMMA import summa, woc
+from pySUMMA.simulate import Rank
+from pySUMMA.utilities import Roc
+from pySUMMA import Summa, RankWoc
 from pySUMMA import plot
 
 
@@ -81,29 +87,29 @@ nSamples = 2500
 nPositiveSamples = int(0.3 * nSamples)
 
 # simulate data set
-sim = rank(nClassifiers, nSamples, nPositiveSamples)
+sim = Rank(nClassifiers, nSamples, nPositiveSamples)
 sim.sim()
 
 # apply SUMMA to the simulation data
-cls = summa()
+cls = Summa()
 # note that sim.data is an nClassifier by nSample ndarray
 cls.fit(sim.data)
 
 # wisdom of the crowd classifier
-clw = woc()
+clw = RankWoc()
 
 # compute the AUC for SUMMA and WOC ensembles, and retrieve the AUC of the best individual classifier
-clAUC = {"SUMMA" : roc(cls.get_scores(sim.data),
-                            sim.labels).auc,
-             "WOC" : roc(clw.get_scores(sim.data),
-                            sim.labels).auc,
-             "Best Ind" : sim.get_auc().max()}
+clAUC = {"SUMMA" : Roc(cls.get_scores(sim.data),
+                       sim.labels).auc,
+         "WOC" : Roc(clw.get_scores(sim.data),
+                     sim.labels).auc,
+         "Best Ind" : sim.get_empirical_auc().max()}
 
 # plot the inferred AUC of base classifiers vs the true AUC
 # and plot the AUC of each ensemble classifier
-plot.performance(sim.get_auc(),		# True base classifier AUC
-                      cls.get_auc(),   	   	# inferred base classifier AUC
-                      clAUC) 	# ensemble AUC in python dictionary
+plot.performance(sim.get_empirical_auc(),		
+                 cls.get_auc(),   	   	
+                 clAUC)
 
 ```
 
@@ -112,9 +118,9 @@ plot.performance(sim.get_auc(),		# True base classifier AUC
 SML
 ---
 
-Parisi et al. [3] developed the Spectral Meta Learner (SML) as an 
-unsupervised ensemble method.  Here, binary predictions [-1, 1] of an ensemble of M 
-base classifiers are aggregated by a weighted sum.  The weight (w_i) of the i th base 
+Parisi et al. [3] developed the Spectral Meta Learner (SML) as an
+unsupervised ensemble method.  Here, binary predictions [-1, 1] of an ensemble of M
+base classifiers are aggregated by a weighted sum.  The weight (w_i) of the i th base
 classifier is proportional to its performance, which when written in latex notation is
 
 w_i \propto 2\pi_i - 1
@@ -124,12 +130,12 @@ They found that these weights can be estimated from data, without class labels,
 when the predictions of the base classifiers are conditionally independent.  
 Under the assumption of conditional independence the authors found that
 the off-diagonal elements of covariance matrix of base classifier predictions
-are that of a rank one matrix.  The corresponding i th eigenvector 
+are that of a rank one matrix.  The corresponding i th eigenvector
 element of this rank one matrix, written in latex notation, is
 
 v_i = (2\pi_i - 1) / ||2\pi -1||
 
-where ||2\pi-1|| is the vector norm.  Consequently, the authors set each weight w_i 
+where ||2\pi-1|| is the vector norm.  Consequently, the authors set each weight w_i
 equal to v_i for each i = 1, 2, 3, ..., M.
 
 Jaffe et al [4] extended the work of Parisi et al. [3] by studying the properties
@@ -148,9 +154,9 @@ Below you will find an example for running in an interactive Python prompt.
 ```python
 # load modules
 
-from pySUMMA.simulate import binary
-from pySUMMA.utilities import ba
-from pySUMMA import sml
+from pySUMMA.simulate import Binary
+from pySUMMA.utilities import Ba
+from pySUMMA import Sml, BinaryWoc
 from pySUMMA import plot
 
 
@@ -160,24 +166,29 @@ nSamples = 2500
 nPositiveSamples = int(0.3 * nSamples)
 
 # simulate data set
-sim = binary(nClassifiers, nSamples, nPositiveSamples)
+sim = Binary(nClassifiers, nSamples, nPositiveSamples)
 sim.sim()
 
 # apply SML to the simulation data
-cls = sml()
+cls = Sml()
 # note that sim.data is an nClassifier by nSample ndarray
 cls.fit(sim.data)
 
+clw = BinaryWoc()
+
 # compute the BA for SML and retrieve the BA of the best individual classifier
-clBA = {"SML" : ba(cls.get_inference(sim.data),
-                        sim.labels).ba,
-            "Best Ind" : sim.get_ba().max()}
+clBA = {"SML": Ba(cls.get_inference(sim.data),
+                   sim.labels).ba,
+        "WOC": Ba(clw.get_inference(sim.data),
+                  sim.labels).ba,
+        "Best Ind" : sim.get_ba().max()}
 
 # plot the inferred AUC of base classifiers vs the true AUC
 # and plot the AUC of each ensemble classifier
-plot.performance(sim.get_ba(),		# True base classifier BA
-                    cls.get_ba(),   	   	# inferred base classifier BA
-                    clBA) 	# ensemble BA in python dictionary
+plot.performance(sim.get_ba(),
+                 cls.get_ba(),
+                 clBA,
+                 metric="BA")
 
 ```
 
