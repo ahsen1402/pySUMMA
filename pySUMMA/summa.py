@@ -39,7 +39,6 @@ from .decomposition import Tensor
 from .utilities.check_data import check_rank_data
 from .utilities import third
 
-
 class Summa:
     """Apply SUMMA ensemble to data.
 
@@ -85,9 +84,6 @@ class Summa:
             ValueError: when M methods < 5 or N samples < 5.
             ValueError: when data are not ranks.
         """
-        if data.shape[0] < 5 or data.shape[1] < 5:
-            raise ValueError("SUMMA requires at least 5 base classifiers and samples.")
-
         check_rank_data(data)
 
         self.N = data.shape[1]

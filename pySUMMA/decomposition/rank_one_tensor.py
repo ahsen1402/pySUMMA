@@ -34,9 +34,26 @@ References:
 Available classes:
 - Tensor
 """
-
+from warnings import warn
 import numpy as np
 from scipy.special import comb
+
+def check_inputs(tensor_shape, vector_shape):
+    """Warnings and errors for data with 3 or less base classifiers."""
+    if len(vector_shape) != 1:
+        raise ValueError("Input vector should be an M length ndarray")
+    M = vector_shape[0]
+    if tensor_shape != (M, M, M):
+        raise ValueError("Input tensor should be an MxMxM and"
+                         "input vector M length ndarray")
+    if M < 3:
+        raise ValueError("The minimum required number of base classifiers is 3.")
+    elif M == 3:
+        warn("3 Base Classifiers may result in unreliable\n"
+             "estimation of the positive class sample\n"
+             "prevalence and the magnitude of each base\n"
+             "classifiers performance.  The inferred weights used for\n"
+             "computing the sample scores is unaffected.")
 
 def get_tensor_idx(M):
     """Get indecies i \neq j \neq k of the 3rd order tensor (M, M, M) tensor T.
@@ -70,15 +87,24 @@ class Tensor:
         v: Eigenvector of base classifier performances,
             from the matrix decomposition class ((M,) ndarray)
 
-    Public Methods:
-    fit_singular_value:
+    Methods:
+        tensor_and_eigenvector_elements: extract tensor values into array
+        fit_singular_value: infer tensor singular by linear regression.
+
+    Raises:
+        ValueError: when the number of base classifiers 
+            is less than 3, tensor is not MxMxM, that 
+            T.shape = (M,M,M) and v.shape = (M,)
+        UserWarning: when the number of base classifiers
+            is equal to 3.
     """
     def __init__(self, T, v):
+        check_inputs(T.shape, v.shape)
         self.tensorIndex = get_tensor_idx(T.shape[0])
-        self.eigenvectorData, self.tensorData = self.set_tensor_eigenvector_elements(T, v)
+        self.eigenvectorData, self.tensorData = self.tensor_and_eigenvector_elements(T, v)
         self.singular_value = self.fit_singular_value()
     
-    def set_tensor_eigenvector_elements(self, T, v):
+    def tensor_and_eigenvector_elements(self, T, v):
         """Extract tensor elements T_{ijk} for i \neq j \neq k.
         
         Args:
@@ -102,9 +128,12 @@ class Tensor:
             eigData[j] = v[widx[0]] * v[widx[1]] * v[widx[2]]
             j += 1
         
-        return [eigData, tData]
+        return (eigData, tData)
 
     def fit_singular_value(self):
         """Fit singular value by linear regression."""
-        c = np.cov(self.eigenvectorData, self.tensorData)
-        return c[0, 1] / c[0, 0]
+        if len(self.eigenvectorData) == 1:
+            return self.tensorData[0] / self.eigenvectorData[0]
+        else:
+            c = np.cov(self.eigenvectorData, self.tensorData)
+            return c[0, 1] / c[0, 0]

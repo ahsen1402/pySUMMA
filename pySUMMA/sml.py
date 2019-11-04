@@ -91,9 +91,6 @@ class Sml:
             ValueError: when M methods < 5 or N samples < 5.
             ValueError: when data are not binary values [-1, 1].
         """
-        if data.shape[0] < 5 or data.shape[1] < 5:
-            raise ValueError("SML requires at least 5 base classifiers and samples.")
-
         check_binary_data(data)
 
         # Covariance decomposition

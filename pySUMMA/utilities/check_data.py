@@ -24,7 +24,9 @@ def check_rank_data(data):
     
     test_rank = np.arange(1, data.shape[1] + 1)    # Array to test user input data against
     for j in range(data.shape[0]):                 # Test rank data for each method
-        if np.setdiff1d(data[j, :], test_rank).size > 0:
+        test_val = np.setdiff1d(test_rank, data[j, :]).size
+        test_val += np.setdiff1d(data[j, :], test_rank).size
+        if test_val > 0:
             raise ValueError("Base classifier predictions must be a ranked list")
 
 
@@ -38,12 +40,14 @@ def check_binary_data(data):
 
     Exceptions raised:
        TypeError : If data are not an numpy.ndarray
-       ValueError : If data are not rank
+       ValueError : If data are not binary
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("Base classifier predictions must by numpy.ndarray")
     
     test_binary = np.array([-1, 1])                # Array to test user input data against
     for j in range(data.shape[0]):                 # Test binary data for each method
-        if np.setdiff1d(data[j, :], test_binary).size > 0:
+        test_val = np.setdiff1d(test_binary, data[j, :]).size 
+        test_val += np.setdiff1d(data[j, :], test_binary).size
+        if test_val > 0:
             raise ValueError("Base classifier predictions must be a binary values -1 or 1")

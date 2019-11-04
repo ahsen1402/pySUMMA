@@ -1,16 +1,45 @@
+"""Implementation of Receiver Operator Characteristic."""
 import numpy as np
+from warnings import warn
+
+def _check(scores, true_labels):
+    """Raise exceptions or warnings for wrong or questionable inputs."""
+    if scores.ndim != 1 or true_labels.ndim !=1:
+        raise ValueError("Scores and labels must be one dimensional arrays")
+    
+    if scores.size != true_labels.size:
+        raise ValueError("Scores and labels must have same number of entries")
+    
+    # test that labels are exclusively [0, 1]
+    test_value = np.setdiff1d(np.array([0, 1]), true_labels).size
+    test_value += np.setdiff1d(true_labels, np.array([0, 1])).size
+    if test_value > 0:
+        raise ValueError("True sample class labels\n"
+                         "must be either 0 or 1, exclusively.")
+
+    if np.unique(scores).size != scores.size:
+        warn("Duplicate scores detected, may cause arbitrary sample ranking.")
+
 
 class Roc:
+    """Receiver Operating Characteristic.
+    Args:
+        s: Sample scores, relatively high score indicative of postive class samples
+            ((N sample,) ndarray) 
+        t: true sample labels [0, 1] ((N sample,) ndarray)
+    Important Attributes:
+        self.tpr: true positive rates (ndarray)
+        self.fpr: false positive rates (ndarray)
+        self.auc: Area Under Curve (float)
+    Public Methods:
+        to_dict: returns dictionary of Important attributes.
+    Raises:
+        ValueError: Number of input data entries do not match, or 
+            are not 1d array, or true class labels not exclusively [0,1].
+        UserWarning: if duplicate sample scores are detected
+    """
     def __init__(self, s, t):
-        """
-        Input:
-        ------
-        s : ndarray
-        (N sample) sample scores
-        
-        t: ndarray
-        (N sample) true sample labels [0, 1]
-        """
+        _check(s,t)
         self.N = len(s)
         self.tpr = np.zeros(self.N)
         self.fpr = np.zeros(self.N)
