@@ -12,10 +12,12 @@ LICENSE_NAME="Apache License 2.0"
 # VERSION
 version_file = resource_string("pySUMMA", "__init__.py").decode("utf-8")
 version_file = version_file.strip().split("\n")
-j = 0
-while "__version__" not in version_file[j]:
-    j+=1
-VERSION = re.search("[0-9.]+", version_file[j]).group()
+
+for tline in version_file:
+    if "__version__" in tline:
+        break
+
+VERSION = re.search("[0-9.]+", tline).group()
 
 # LONG DESCRIPTION
 LONG_DESCRIPT = resource_string("pySUMMA", "../README.md").decode("utf-8").strip()
