@@ -15,7 +15,7 @@ LONG_DESCRIPTION = ''
 with open('README.md') as fp:
     LONG_DESCRIPTION = fp.read()
 # REQUIREMENTS, relaxing version for pkg_resource
-REQUIREMENTS = ['numpy', 'scipy', 'matplotlib']
+REQUIREMENTS = ['numpy>=1.14.0', 'scipy>=1.0.0', 'matplotlib>=2.2.0']
 
 setup(
     name=NAME,
