@@ -1,43 +1,35 @@
-import os
-import re
+"""Package installer."""
 from setuptools import setup, find_packages
-from pkg_resources import resource_string
 
 # Set Parameters
-NAME='pySUMMA'
-DESCRIPTION = "Methods for aggregating predictions by binary classification methods."
-PYTHON_VERSION="==3.7.3"
-LICENSE_NAME="Apache License 2.0"
-
+NAME = 'pySUMMA'
+DESCRIPTION = (
+    'Methods for aggregating predictions by binary classification methods.'
+)
+PYTHON_VERSION = '==3.7.3'
+LICENSE_NAME = 'Apache License 2.0'
 # VERSION
-version_file = resource_string("pySUMMA", "__init__.py").decode("utf-8")
-version_file = version_file.strip().split("\n")
-
-for tline in version_file:
-    if "__version__" in tline:
-        break
-
-VERSION = re.search("[0-9.]+", tline).group()
-
+VERSION = '0.3.1'
 # LONG DESCRIPTION
-LONG_DESCRIPT = resource_string("pySUMMA", "../README.md").decode("utf-8").strip()
+LONG_DESCRIPTION = ''
+with open('README.md') as fp:
+    LONG_DESCRIPTION = fp.read()
+# REQUIREMENTS, relaxing version for pkg_resource
+REQUIREMENTS = ['numpy', 'scipy', 'matplotlib']
 
-# REQUIREMENTS
-REQUIREMENTS = resource_string("pySUMMA", "../requirements.txt").decode("utf-8")
-REQUIREMENTS = REQUIREMENTS.strip().split("\n")
-
-setup(name=NAME,
+setup(
+    name=NAME,
     version=VERSION,
     python_requires=PYTHON_VERSION,
-    long_description=LONG_DESCRIPT,
+    long_description=LONG_DESCRIPTION,
     long_description_content_type='text/markdown',
     author='Robert Vogel and Mehmet Eren Ahsen',
     license=LICENSE_NAME,
-    description = DESCRIPTION,
+    description=DESCRIPTION,
     packages=find_packages(),
     install_requires=REQUIREMENTS,
     classifiers=[
-        "Programming Language :: Python :: 3.7",
-        "License :: OSI Approved :: Apache Software License"
+        'Programming Language :: Python :: 3.7',
+        'License :: OSI Approved :: Apache Software License'
     ]
 )
