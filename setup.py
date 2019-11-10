@@ -6,7 +6,7 @@ NAME = 'pySUMMA'
 DESCRIPTION = (
     'Methods for aggregating predictions by binary classification methods.'
 )
-PYTHON_VERSION = '>=3.7'
+PYTHON_VERSION = '>=3.5'
 LICENSE_NAME = 'Apache License 2.0'
 # VERSION
 VERSION = '0.3.1'
@@ -29,7 +29,10 @@ setup(
     packages=find_packages(),
     install_requires=REQUIREMENTS,
     classifiers=[
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'License :: OSI Approved :: Apache Software License'
     ]
 )
