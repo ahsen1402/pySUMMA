@@ -6,7 +6,7 @@ NAME = 'pySUMMA'
 DESCRIPTION = (
     'Methods for aggregating predictions by binary classification methods.'
 )
-PYTHON_VERSION = '==3.7.3'
+PYTHON_VERSION = '>=3.7'
 LICENSE_NAME = 'Apache License 2.0'
 # VERSION
 VERSION = '0.3.1'
