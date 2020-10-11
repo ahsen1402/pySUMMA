@@ -9,7 +9,7 @@ DESCRIPTION = (
 PYTHON_VERSION = '>=3.5'
 LICENSE_NAME = 'Apache License 2.0'
 # VERSION
-VERSION = '0.3.1'
+VERSION = '0.3.2a'
 # LONG DESCRIPTION
 LONG_DESCRIPTION = ''
 with open('README.md') as fp:

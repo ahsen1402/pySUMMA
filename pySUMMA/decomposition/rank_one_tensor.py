@@ -135,5 +135,6 @@ class Tensor:
         if len(self.eigenvectorData) == 1:
             return self.tensorData[0] / self.eigenvectorData[0]
         else:
-            c = np.cov(self.eigenvectorData, self.tensorData)
-            return c[0, 1] / c[0, 0]
+            dy = np.sum(self.eigenvectorData * self.tensorData)
+            dx = np.sum(self.eigenvectorData**2)
+            return dy / dx
