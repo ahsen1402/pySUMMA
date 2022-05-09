@@ -30,11 +30,7 @@ Installation
 
 ### Installation from a local copy
 
-The pySUMMA package can be installed from a local copy of the pySUMMA package source code using setuptools.  
-First, make a directory in which you would like the pySUMMA package to be located, let's call this directory 
-`myProject`.  Either clone the pySUMMA repository or download a ZIP copy and decompress.  Next, assuming
-that a Python virtual environment named `SummaEnv` is activated, install the package using pip from the
-local repository by
+The pySUMMA package can be installed from a local copy of the pySUMMA package source code using setuptools.  First, make a directory in which you would like the pySUMMA package to be located, let's call this directory`myProject.  Either clone the pySUMMA repository or download a ZIP copy and decompress.  Next, assuming that a Python virtual environment named `SummaEnv` is activated, install the package using pip from the local repository by
 
 ```bash
 (SummaEnv) $ pip install /my/path/to/myProject/pySUMMA/
