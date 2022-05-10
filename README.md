@@ -30,7 +30,7 @@ Installation
 
 ### Installation from a local copy
 
-The pySUMMA package can be installed from a local copy of the pySUMMA package source code using setuptools.  First, make a directory in which you would like the pySUMMA package to be located, let's call this directory`myProject`.  Either clone the pySUMMA repository or download a ZIP copy and decompress.  Next, assuming that a Python virtual environment named `SummaEnv` is activated, install the package using pip from the local repository by
+The pySUMMA package can be installed from a local copy of the pySUMMA package source code using setuptools.  First, make a directory in which you would like the pySUMMA package to be located, let's call this directory `myProject`.  Either clone the pySUMMA repository or download a ZIP copy and decompress.  Next, assuming that a Python virtual environment named `SummaEnv` is activated, install the package using pip from the local repository by
 
 ```bash
 (SummaEnv) $ pip install /my/path/to/myProject/pySUMMA/
@@ -183,10 +183,18 @@ Cite Us
 Please don't forget to cite our manuscript:
 
 ```
-  @article{summa_pkg,
-    author  = {Mehmet Eren Ahsen and Robert Vogel and Gustavo Stolovitzky},
-    title = {SUMMA: An R/Python Package for Unsupervised Ensemble Learning},
-  }
+@article{Ahsen2020JournalCompBio,
+    author = {Ahsen, Mehmet Eren and Vogel, Robert and Stolovitzky, Gustavo A.},
+    title = {R/PY-SUMMA: An R/Python Package for Unsupervised Ensemble Learning for Binary Classification Problems in Bioinformatics},
+    journal = {Journal of Computational Biology},
+    volume = {27},
+    number = {9},
+    pages = {1337-1340},
+    year = {2020},
+    doi = {10.1089/cmb.2019.0348},
+    note ={PMID: 31905016},
+    eprint = {https://doi.org/10.1089/cmb.2019.0348}
+}
 ```
 
 References
