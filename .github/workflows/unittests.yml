@@ -19,18 +19,16 @@ run-name: ${{ gethub.actor }} running unit-tests
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
 #, "3.8", "3.9", "3.10"]
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix: 
-        python-version: ["3.7"]
+        python-version: [ "3.7", "3.8" ]
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
