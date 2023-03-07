@@ -38,10 +38,10 @@ The pySUMMA package can be installed from a local copy of the pySUMMA package so
 
 ### Installation from GitHub
 
-If the dependencies are installed and the corresponding virtual environment `SummaEnv` is active then `pySUMMA` can be installed from this GitHub repository.  One way to install `pySUMMA` from the master branch is to,
+If the dependencies are installed and the corresponding virtual environment `SummaEnv` is active then `pySUMMA` can be installed from this GitHub repository.  One way to install `pySUMMA` from the main branch is to,
 
 ```bash
-(SummaEnv) pip install git+https://github.com/ahsen1402/pySUMMA.git@master
+(SummaEnv) pip install git+https://github.com/ahsen1402/pySUMMA.git@main
 ```
 
 at the command line.
